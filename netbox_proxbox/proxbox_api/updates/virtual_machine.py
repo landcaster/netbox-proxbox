@@ -307,10 +307,11 @@ def interfaces(netbox_vm, proxmox_vm):
             _bridge = None
             for _conf_str in interface[ifname].split(','):
                 _k_s =_conf_str.split('=')
-                if re.match("[0-9a-f]{2}([-:]?)[0-9a-f]{2}(\\1[0-9a-f]{2}){4}$", _k_s[1].lower()):
+                
+                if _k_s[1] and re.match("[0-9a-f]{2}([-:]?)[0-9a-f]{2}(\\1[0-9a-f]{2}){4}$", _k_s[1].lower()):
                     _mac_addr =_k_s[1].lower()
                 elif _k_s[0] == 'bridge':
-                    _bridge = _k_s[1].lower()
+                    _bridge = _k_s[1].lower() if _k_s[1]  else None
                 elif _k_s[0] == 'mtu':
                     if int(_k_s[1]) == 1:
                         if _bridge is not None:
@@ -380,7 +381,7 @@ def interfaces_ips(netbox_vm, proxmox_vm):
                 try:
                     for interface in proxmox.nodes(proxmox_vm['node']).qemu(proxmox_vm['vmid']).agent.get('network-get-interfaces')['result']:
 
-                        if interface['name'].lower() != 'lo':
+                        if interface['name'] and interface['name'].lower() != 'lo':
                             _mac = interface.get("hardware-address")
 
                             if _mac:
@@ -389,15 +390,16 @@ def interfaces_ips(netbox_vm, proxmox_vm):
                             _if = {_mac: []}
                             if 'ip-addresses' in interface:
                                 for addr in interface['ip-addresses']:
+                                
                                     _if[_mac].append('%(address)s/%(netmask)s'.lower() % {'address': addr['ip-address'],'netmask': addr['prefix']})
                             _pmx_ips.append(_if)
 
                     for interface in nb.virtualization.interfaces.filter(virtual_machine_id=netbox_vm.id):
-                        _mac = interface['mac_address'].lower()
+                        _mac = interface['mac_address'].lower() if interface['mac_address'] else None
                         _if = {_mac: []}
                         for ip in nb.ipam.ip_addresses.filter(virtual_machine_id=netbox_vm.id):
                             if ip.assigned_object_id == interface.id:
-                                _if[_mac].append(ip.address.lower())
+                              _if[_mac].append(ip.address.lower() if ip.address else None)
                         _ntb_ips.append(_if)
                 except ResourceException as e:
                     print('[ERROR]' + str(e))
@@ -410,7 +412,7 @@ def interfaces_ips(netbox_vm, proxmox_vm):
                     proxmox_ipaddr = []
                     for _conf_str in interface[ifname].split(','):
                         _k_s =_conf_str.split('=') 
-                        if re.match("[0-9a-f]{2}([-:]?)[0-9a-f]{2}(\\1[0-9a-f]{2}){4}$", _k_s[1].lower()):
+                        if _k_s[1] and re.match("[0-9a-f]{2}([-:]?)[0-9a-f]{2}(\\1[0-9a-f]{2}){4}$", _k_s[1].lower()):
                             _mac_addr =_k_s[1].lower()
                         elif _k_s[0] == 'ip':
                             if _k_s[1] != 'dhcp':
@@ -421,11 +423,11 @@ def interfaces_ips(netbox_vm, proxmox_vm):
                     _pmx_ips.append({_mac_addr: proxmox_ipaddr})
 
             for interface in nb.virtualization.interfaces.filter(virtual_machine_id=netbox_vm.id):
-                _mac = interface['mac_address'].lower()
+                _mac = interface['mac_address'].lower() if interface['mac_address'] else None
                 _if = {_mac: []}
                 for ip in nb.ipam.ip_addresses.filter(virtual_machine_id=netbox_vm.id):
                     if ip.assigned_object_id == interface.id:
-                        _if[_mac].append(ip.address.lower())
+                        _if[_mac].append(ip.address.lower() if ip.address else None)
                 _ntb_ips.append(_if)
 
         for pmx_mac in [list(x)[0] for x in _pmx_ips]:
